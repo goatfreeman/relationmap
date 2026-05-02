@@ -1,6 +1,8 @@
+import { useState } from 'react'
 import { useMapStore } from '../store/mapStore'
 import { generateId, palette } from '../utils/helpers'
 import { PersonNode } from '../types'
+import { InputModal } from './InputModal'
 
 interface SidebarProps {
   isOpen: boolean
@@ -8,6 +10,9 @@ interface SidebarProps {
 }
 
 function Sidebar({ isOpen, onToggle }: SidebarProps) {
+  const [showPersonModal, setShowPersonModal] = useState(false)
+  const [showGroupModal, setShowGroupModal] = useState(false)
+
   const {
     mapTitle,
     setMapTitle,
@@ -21,36 +26,56 @@ function Sidebar({ isOpen, onToggle }: SidebarProps) {
     addNode,
     deleteNode,
     addGroup,
+    selectNode,
   } = useMapStore()
 
-  const handleAddPerson = () => {
+  const handleAddPerson = (name: string) => {
     const newNode: PersonNode = {
       id: generateId('p'),
-      name: '?',
+      name: name || '?',
       notes: '',
       color: '#4F46E5',
       visible: true,
       noteVisibleSetting: true,
     }
     addNode(newNode)
+    selectNode(newNode.id)
+    setShowPersonModal(false)
   }
 
-  const handleAddGroup = () => {
-    const groupName = prompt('Group Name:')
-    if (groupName) {
+  const handleAddGroup = (name: string) => {
+    if (name.trim()) {
       addGroup({
         id: generateId('g'),
-        name: groupName,
+        name: name.trim(),
         notes: '',
         color: palette[groups.length % palette.length],
         members: [],
         visible: true,
       })
+      setShowGroupModal(false)
     }
   }
 
   return (
     <>
+      {/* Input Modals */}
+      <InputModal
+        isOpen={showPersonModal}
+        title="Add New Person"
+        placeholder="Enter person's name..."
+        onSubmit={handleAddPerson}
+        onCancel={() => setShowPersonModal(false)}
+      />
+
+      <InputModal
+        isOpen={showGroupModal}
+        title="Create New Group"
+        placeholder="Enter group name..."
+        onSubmit={handleAddGroup}
+        onCancel={() => setShowGroupModal(false)}
+      />
+
       {/* Sidebar */}
       <div
         className={`fixed left-0 top-0 h-screen w-80 bg-white border-r border-gray-200 flex flex-col z-50 transition-transform duration-300 ${
@@ -98,13 +123,13 @@ function Sidebar({ isOpen, onToggle }: SidebarProps) {
               Management
             </div>
             <button
-              onClick={handleAddPerson}
+              onClick={() => setShowPersonModal(true)}
               className="w-full px-3 py-2 bg-primary text-white rounded-lg text-sm font-semibold hover:bg-indigo-600"
             >
               + Add Person
             </button>
             <button
-              onClick={handleAddGroup}
+              onClick={() => setShowGroupModal(true)}
               className="w-full mt-2 px-3 py-2 bg-success text-white rounded-lg text-sm font-semibold hover:bg-green-600"
             >
               + Add Group

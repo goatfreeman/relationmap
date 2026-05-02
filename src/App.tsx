@@ -1,8 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import ReactFlow, {
   Node,
   Edge as FlowEdge,
-  addEdge,
   Connection,
   useNodesState,
   useEdgesState,
@@ -12,20 +11,22 @@ import ReactFlow, {
 import 'reactflow/dist/style.css'
 
 import { useMapStore } from './store/mapStore'
-import { PersonNode, Edge, Group } from './types'
+import { PersonNode, Edge } from './types'
 import Sidebar from './components/Sidebar'
-import PersonNode from './components/nodes/PersonNode'
+import PersonNodeComponent from './components/nodes/PersonNode'
 import EditPanel from './components/EditPanel'
 import Dashboard from './components/Dashboard'
+import { InputModal } from './components/InputModal'
 import { generateId } from './utils/helpers'
 
 const nodeTypes = {
-  person: PersonNode,
+  person: PersonNodeComponent,
 }
 
-function App() {
+function AppContent() {
   const [showDashboard, setShowDashboard] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [showCanvasAddModal, setShowCanvasAddModal] = useState(false)
   const [nodes, setNodes, onNodesChange] = useNodesState([])
   const [edges, setEdges, onEdgesChange] = useEdgesState([])
 
@@ -42,44 +43,6 @@ function App() {
     addEdge: addStoreEdge,
     updateNode,
   } = useMapStore()
-
-  // Load initial data from localStorage
-  useEffect(() => {
-    const mapIdFromUrl = new URLSearchParams(window.location.search).get('id')
-    if (mapIdFromUrl) {
-      setCurrentMapId(mapIdFromUrl)
-    }
-
-    const saved = localStorage.getItem(`map_${currentMapId}`)
-    if (saved) {
-      const data = JSON.parse(saved)
-      // Load nodes and edges from saved data
-      setMapTitle(data.title)
-    }
-  }, [])
-
-  // Convert store nodes to React Flow nodes
-  useEffect(() => {
-    const flowNodes: Node[] = storeNodes.map((node) => ({
-      id: node.id,
-      data: { label: node.name, node },
-      position: JSON.parse(localStorage.getItem(`node_pos_${node.id}`) || '{"x": 0, "y": 0}'),
-      type: 'person',
-    }))
-    setNodes(flowNodes)
-  }, [storeNodes, setNodes])
-
-  // Convert store edges to React Flow edges
-  useEffect(() => {
-    const flowEdges: FlowEdge[] = storeEdges.map((edge) => ({
-      id: edge.id,
-      source: edge.source,
-      target: edge.target,
-      label: edge.label,
-      data: { edge },
-    }))
-    setEdges(flowEdges)
-  }, [storeEdges, setEdges])
 
   // Handle node position changes
   const handleNodesChange = (changes: any) => {
@@ -108,18 +71,67 @@ function App() {
     addStoreEdge(newEdge)
   }
 
-  const handleAddNode = (position: { x: number; y: number }) => {
+  const handleAddPersonFromCanvas = (name: string) => {
+    if (!name.trim()) return
+    
     const newNode: PersonNode = {
-      id: `p${Date.now()}`,
-      name: '?',
+      id: generateId('p'),
+      name: name.trim(),
       notes: '',
       color: '#4F46E5',
       visible: true,
       noteVisibleSetting: true,
     }
     addNode(newNode)
-    localStorage.setItem(`node_pos_${newNode.id}`, JSON.stringify(position))
+    setShowCanvasAddModal(false)
   }
+
+  const handlePaneClick = useCallback((e: any) => {
+    // Only trigger if clicking on the canvas background
+    if (e.target !== e.currentTarget) return
+    
+    // Don't trigger on multiple clicks quickly
+    if (e.detail !== 2) return // Only double-click
+    
+    setShowCanvasAddModal(true)
+  }, [])
+
+  // Load initial data from localStorage
+  useEffect(() => {
+    const mapIdFromUrl = new URLSearchParams(window.location.search).get('id')
+    if (mapIdFromUrl) {
+      setCurrentMapId(mapIdFromUrl)
+    }
+
+    const saved = localStorage.getItem(`map_${currentMapId}`)
+    if (saved) {
+      const data = JSON.parse(saved)
+      setMapTitle(data.title)
+    }
+  }, [])
+
+  // Convert store nodes to React Flow nodes
+  useEffect(() => {
+    const flowNodes: Node[] = storeNodes.map((node) => ({
+      id: node.id,
+      data: { label: node.name, node },
+      position: JSON.parse(localStorage.getItem(`node_pos_${node.id}`) || '{"x": 0, "y": 0}'),
+      type: 'person',
+    }))
+    setNodes(flowNodes)
+  }, [storeNodes, setNodes])
+
+  // Convert store edges to React Flow edges
+  useEffect(() => {
+    const flowEdges: FlowEdge[] = storeEdges.map((edge) => ({
+      id: edge.id,
+      source: edge.source,
+      target: edge.target,
+      label: edge.label,
+      data: { edge },
+    }))
+    setEdges(flowEdges)
+  }, [storeEdges, setEdges])
 
   // Auto-save to localStorage
   useEffect(() => {
@@ -144,6 +156,15 @@ function App() {
 
   return (
     <div className="flex h-screen bg-gray-100">
+      {/* Canvas Add Modal */}
+      <InputModal
+        isOpen={showCanvasAddModal}
+        title="Add New Person"
+        placeholder="Enter person's name..."
+        onSubmit={handleAddPersonFromCanvas}
+        onCancel={() => setShowCanvasAddModal(false)}
+      />
+
       {/* Sidebar */}
       <Sidebar isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
 
@@ -168,15 +189,7 @@ function App() {
             onEdgesChange={onEdgesChange}
             onConnect={handleConnect}
             nodeTypes={nodeTypes}
-            onPaneClick={(e) => {
-              if (e.target === e.currentTarget) {
-                // Add node on canvas click
-                const bounds = (e.currentTarget as HTMLElement).getBoundingClientRect()
-                const x = e.clientX - bounds.left
-                const y = e.clientY - bounds.top
-                // TODO: Implement proper position conversion
-              }
-            }}
+            onPaneClick={handlePaneClick}
           >
             <Background />
             <Controls />
@@ -198,6 +211,10 @@ function App() {
       </div>
     </div>
   )
+}
+
+function App() {
+  return <AppContent />
 }
 
 export default App
